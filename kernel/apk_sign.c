@@ -19,6 +19,12 @@
 #include "klog.h" // IWYU pragma: keep
 #include "kernel_compat.h"
 #include "manager_sign.h"
+#ifdef CONFIG_KSU_SUSFS
+#define EXPECTED_SIZE_5EC1CFF 0x180
+#define EXPECTED_HASH_5EC1CFF \
+	"7e0c6d7278a3bb8e364e0fcba95afaf3666cf5ff3c245a3b63c8833bd0445cc4"
+#endif
+
 
 struct sdesc {
 	struct shash_desc shash;
@@ -30,6 +36,9 @@ static struct apk_sign_key {
 	const char *sha256;
 } apk_sign_keys[] = {
 	{ EXPECTED_SIZE_SHIRKNEKO, EXPECTED_HASH_SHIRKNEKO }, // SukiSU
+#ifdef CONFIG_KSU_SUSFS
+	{ EXPECTED_SIZE_5EC1CFF, EXPECTED_HASH_5EC1CFF }, // Magic Mount (5ec1cff)
+#endif
 #ifdef EXPECTED_SIZE
 	{ EXPECTED_SIZE, EXPECTED_HASH }, // Custom
 #endif
@@ -418,7 +427,7 @@ module_param_cb(ksu_debug_manager_uid, &expected_size_ops,
 
 #endif
 
-bool is_manager_apk(char *path)
+bool ksu_is_manager_apk(char *path)
 {
 	return check_v2_signature(path, false, NULL);
 }
