@@ -326,7 +326,7 @@ class ModuleSizeCache(context: Context) {
         private const val CACHE_PREFS_NAME = "module_size_cache"
         private const val CACHE_VERSION_KEY = "cache_version"
         private const val CACHE_INITIALIZED_KEY = "cache_initialized"
-        private const val CURRENT_CACHE_VERSION = 1
+        private const val CURRENT_CACHE_VERSION = 2
     }
 
     private val cachePrefs = context.getSharedPreferences(CACHE_PREFS_NAME, Context.MODE_PRIVATE)
@@ -452,13 +452,20 @@ class ModuleSizeCache(context: Context) {
      */
     private fun calculateModuleFolderSize(dirId: String): Long {
         return try {
-            val shell = getRootShell()
-            val command = "du -sb /data/adb/modules/$dirId"
+            // Use global mount namespace to avoid per-app module unmount policies
+            val shell = getRootShell(true)
+            val modulePath = "/data/adb/modules/$dirId"
+
+            // Use -k (1024-byte blocks) for wider compatibility on toybox/busybox
+            val command = "du -sk $modulePath"
             val result = shell.newJob().add(command).to(ArrayList(), null).exec()
 
             if (result.isSuccess && result.out.isNotEmpty()) {
-                val sizeStr = result.out.firstOrNull()?.split("\t")?.firstOrNull()
-                sizeStr?.toLongOrNull() ?: 0L
+                // Robustly parse first leading number regardless of whitespace separator
+                val firstLine = result.out.firstOrNull()?.trim().orEmpty()
+                val match = Regex("^(\\d+)").find(firstLine)
+                val sizeInKB = match?.groupValues?.getOrNull(1)?.toLongOrNull() ?: 0L
+                sizeInKB * 1024L
             } else {
                 0L
             }
